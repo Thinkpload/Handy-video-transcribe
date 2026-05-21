@@ -836,6 +836,30 @@ async transcribeMeetingVideo(jobId: string, videoPath: string, numSpeakers: numb
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
+},
+async listMeetings() : Promise<Result<MeetingSummary[], string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("list_meetings") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async getMeeting(id: number) : Promise<Result<StoredMeeting | null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_meeting", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async deleteMeeting(id: number) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("delete_meeting", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
 }
 }
 
@@ -881,6 +905,8 @@ export type ModelLoadStatus = { is_loaded: boolean; current_model: string | null
 export type MeetingSegment = { start: number; end: number; speaker: string; text: string }
 export type MeetingProgress = { job_id: string; stage: string; processed_secs: number; total_secs: number }
 export type MeetingResult = { job_id: string; duration_secs: number; segments: MeetingSegment[] }
+export type MeetingSummary = { id: number; created_at: number; file_name: string; source_path: string; language: string; duration_secs: number; segment_count: number; speaker_count: number }
+export type StoredMeeting = { id: number; created_at: number; file_name: string; source_path: string; language: string; duration_secs: number; segments: MeetingSegment[] }
 export type ModelUnloadTimeout = "never" | "immediately" | "min_2" | "min_5" | "min_10" | "min_15" | "hour_1" | "sec_15"
 export type OrtAcceleratorSetting = "auto" | "cpu" | "cuda" | "directml" | "rocm"
 export type OverlayPosition = "none" | "top" | "bottom"

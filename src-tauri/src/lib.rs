@@ -165,6 +165,11 @@ fn initialize_core_logic(app_handle: &AppHandle) {
     app_handle.manage(transcription_manager.clone());
     app_handle.manage(history_manager.clone());
 
+    match managers::meetings_store::MeetingsStore::new(app_handle) {
+        Ok(store) => app_handle.manage(Arc::new(store)),
+        Err(e) => log::error!("Failed to initialise meetings store: {}", e),
+    }
+
     // Note: Shortcuts are NOT initialized here.
     // The frontend is responsible for calling the `initialize_shortcuts` command
     // after permissions are confirmed (on macOS) or after onboarding completes.
@@ -429,6 +434,9 @@ pub fn run(cli_args: CliArgs) {
             commands::meetings::diarization_models_present,
             commands::meetings::download_diarization_models,
             commands::meetings::transcribe_meeting_video,
+            commands::meetings::list_meetings,
+            commands::meetings::get_meeting,
+            commands::meetings::delete_meeting,
             helpers::clamshell::is_laptop,
         ])
         .events(collect_events![managers::history::HistoryUpdatePayload,]);

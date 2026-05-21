@@ -60,8 +60,12 @@ pub fn ffmpeg_available() -> bool {
         .unwrap_or(false)
 }
 
-/// Decode any media file to 16kHz mono f32 PCM via ffmpeg.
-fn extract_pcm(input: &Path) -> Result<Vec<f32>> {
+/// Decode any media file to 16kHz mono f32 PCM via ffmpeg, streaming the
+/// output as it arrives so we can report progress and abort early on cancel.
+///
+/// Diarization needs the full waveform so we still accumulate to a Vec, but
+/// the read happens incrementally rather than blocking on `read_to_end`.
+fn extract_pcm<F: FnMut(usize)>(input: &Path, mut on_progress: F) -> Result<Vec<f32>> {
     let mut child = Command::new("ffmpeg")
         .args(["-nostdin", "-hide_banner", "-loglevel", "error", "-i"])
         .arg(input)
@@ -80,8 +84,47 @@ fn extract_pcm(input: &Path) -> Result<Vec<f32>> {
         .context("Failed to launch ffmpeg. Is it installed and on PATH?")?;
 
     let mut stdout = child.stdout.take().ok_or_else(|| anyhow!("no stdout"))?;
-    let mut buf = Vec::with_capacity(SAMPLE_RATE as usize * 4 * 600);
-    stdout.read_to_end(&mut buf)?;
+    let mut samples: Vec<f32> = Vec::new();
+    // 64 KiB == 16 384 f32 samples == ~1.024s at 16kHz: a good progress cadence.
+    let mut buf = [0u8; 64 * 1024];
+    let mut carry: [u8; 4] = [0; 4];
+    let mut carry_len: usize = 0;
+    let mut last_reported_s: usize = 0;
+
+    loop {
+        let n = stdout.read(&mut buf)?;
+        if n == 0 {
+            break;
+        }
+        let mut start = 0usize;
+        if carry_len > 0 {
+            let need = 4 - carry_len;
+            let take = need.min(n);
+            carry[carry_len..carry_len + take].copy_from_slice(&buf[..take]);
+            carry_len += take;
+            start = take;
+            if carry_len == 4 {
+                samples.push(f32::from_le_bytes(carry));
+                carry_len = 0;
+            }
+        }
+        let aligned_end = start + ((n - start) / 4) * 4;
+        for c in buf[start..aligned_end].chunks_exact(4) {
+            samples.push(f32::from_le_bytes([c[0], c[1], c[2], c[3]]));
+        }
+        let rem = n - aligned_end;
+        if rem > 0 {
+            carry[..rem].copy_from_slice(&buf[aligned_end..n]);
+            carry_len = rem;
+        }
+
+        let now_s = samples.len() / SAMPLE_RATE as usize;
+        if now_s > last_reported_s {
+            on_progress(samples.len());
+            last_reported_s = now_s;
+        }
+    }
+
     let status = child.wait()?;
     if !status.success() {
         let mut err = String::new();
@@ -90,14 +133,10 @@ fn extract_pcm(input: &Path) -> Result<Vec<f32>> {
         }
         return Err(anyhow!("ffmpeg failed: {}", err));
     }
-
-    if buf.len() % 4 != 0 {
+    if carry_len != 0 {
         return Err(anyhow!("ffmpeg produced unaligned PCM output"));
     }
-    let samples: Vec<f32> = buf
-        .chunks_exact(4)
-        .map(|c| f32::from_le_bytes([c[0], c[1], c[2], c[3]]))
-        .collect();
+    on_progress(samples.len());
     Ok(samples)
 }
 
@@ -210,7 +249,22 @@ pub fn transcribe_video(
         },
     );
 
-    let samples = extract_pcm(video_path)?;
+    let samples = {
+        let app_for_cb = app.clone();
+        let job_id_for_cb = job_id.clone();
+        extract_pcm(video_path, |samples_so_far| {
+            let secs = samples_so_far as f32 / SAMPLE_RATE as f32;
+            let _ = app_for_cb.emit(
+                "meeting-progress",
+                MeetingProgress {
+                    job_id: job_id_for_cb.clone(),
+                    stage: "extract".into(),
+                    processed_secs: secs,
+                    total_secs: 0.0,
+                },
+            );
+        })?
+    };
     let total_secs = samples.len() as f32 / SAMPLE_RATE as f32;
 
     let bounds = find_chunk_bounds(&samples);

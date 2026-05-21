@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { open } from "@tauri-apps/plugin-dialog";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import { commands } from "@/bindings";
+import { commands, type MeetingSummary } from "@/bindings";
 import { useSettings } from "@/hooks/useSettings";
+import { exportSegments, type ExportFormat } from "./exporters";
 
 const LANGUAGES: { code: string; label: string }[] = [
   { code: "auto", label: "Auto-detect" },
@@ -52,7 +53,31 @@ export function MeetingsSettings() {
   const [segments, setSegments] = useState<Segment[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
+  const [savedMeetings, setSavedMeetings] = useState<MeetingSummary[]>([]);
   const jobIdRef = useRef<string | null>(null);
+
+  const refreshSaved = useCallback(async () => {
+    const res = await commands.listMeetings();
+    if (res.status === "ok") setSavedMeetings(res.data);
+  }, []);
+
+  useEffect(() => {
+    refreshSaved();
+  }, [refreshSaved]);
+
+  const openSaved = async (id: number) => {
+    const res = await commands.getMeeting(id);
+    if (res.status === "ok" && res.data) {
+      setSegments(res.data.segments);
+      setFileName(res.data.file_name);
+      setError(null);
+    }
+  };
+
+  const deleteSaved = async (id: number) => {
+    await commands.deleteMeeting(id);
+    refreshSaved();
+  };
 
   useEffect(() => {
     commands.checkFfmpegAvailable().then(setFfmpegOk).catch(() => setFfmpegOk(false));
@@ -109,6 +134,7 @@ export function MeetingsSettings() {
         setError(res.error);
       } else {
         setSegments(res.data.segments);
+        refreshSaved();
       }
     } catch (e: any) {
       setError(String(e?.message ?? e));
@@ -117,17 +143,8 @@ export function MeetingsSettings() {
     }
   };
 
-  const exportText = () => {
-    const body = segments
-      .map((s) => `[${formatTime(s.start)}] ${s.speaker}: ${s.text}`)
-      .join("\n");
-    const blob = new Blob([body], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${fileName ?? "transcript"}.txt`;
-    a.click();
-    URL.revokeObjectURL(url);
+  const doExport = (fmt: ExportFormat) => {
+    exportSegments(segments, fileName ?? "transcript", fmt);
   };
 
   const pct =
@@ -205,15 +222,53 @@ export function MeetingsSettings() {
           {busy ? t("meetings.working") : t("meetings.pickFile")}
         </button>
         {segments.length > 0 && (
-          <button
-            onClick={exportText}
-            className="px-4 py-2 rounded border border-mid-gray/40"
-          >
-            {t("meetings.exportTxt")}
-          </button>
+          <div className="flex gap-1">
+            {(["txt", "srt", "vtt", "md", "json"] as ExportFormat[]).map((f) => (
+              <button
+                key={f}
+                onClick={() => doExport(f)}
+                className="px-2 py-1.5 rounded border border-mid-gray/40 text-xs uppercase"
+              >
+                {f}
+              </button>
+            ))}
+          </div>
         )}
         {fileName && <span className="text-sm opacity-70 truncate">{fileName}</span>}
       </div>
+
+      {savedMeetings.length > 0 && (
+        <div className="rounded border border-mid-gray/30">
+          <div className="px-3 py-2 text-xs font-semibold opacity-70 border-b border-mid-gray/20">
+            {t("meetings.savedHeading")}
+          </div>
+          <div className="divide-y divide-mid-gray/20 max-h-48 overflow-y-auto">
+            {savedMeetings.map((m) => (
+              <div key={m.id} className="flex items-center gap-2 px-3 py-2 text-sm">
+                <button
+                  onClick={() => openSaved(m.id)}
+                  className="flex-1 text-left hover:underline truncate"
+                  title={m.source_path}
+                >
+                  <span className="font-medium">{m.file_name}</span>
+                  <span className="opacity-60 ml-2 text-xs">
+                    {new Date(m.created_at * 1000).toLocaleString()} ·{" "}
+                    {formatTime(m.duration_secs)} · {m.speaker_count}{" "}
+                    {t("meetings.speakersShort")}
+                  </span>
+                </button>
+                <button
+                  onClick={() => deleteSaved(m.id)}
+                  className="px-2 py-1 text-xs opacity-60 hover:opacity-100"
+                  title={t("meetings.delete")}
+                >
+                  {t("meetings.deleteIcon")}
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {busy && (
         <div className="flex flex-col gap-1">

@@ -38,15 +38,7 @@ const EMB_DIM_HINT: usize = 256;
 
 /// Powerset classes for pyannote-3.0 (silence + 3 speakers, up to 2 simultaneous).
 /// Index → set of active local speaker indices.
-const POWERSET: [&[usize]; 7] = [
-    &[],
-    &[0],
-    &[1],
-    &[2],
-    &[0, 1],
-    &[0, 2],
-    &[1, 2],
-];
+const POWERSET: [&[usize]; 7] = [&[], &[0], &[1], &[2], &[0, 1], &[0, 2], &[1, 2]];
 
 #[derive(Debug, Clone)]
 pub struct DiarSegment {
@@ -301,7 +293,12 @@ fn best_permutation(
 
     // Brute-force best permutation (6 perms for 3 speakers).
     let perms: [[usize; 3]; 6] = [
-        [0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0],
+        [0, 1, 2],
+        [0, 2, 1],
+        [1, 0, 2],
+        [1, 2, 0],
+        [2, 0, 1],
+        [2, 1, 0],
     ];
     let mut best = [0, 1, 2];
     let mut best_score = f32::NEG_INFINITY;
@@ -324,12 +321,7 @@ struct Turn {
 
 /// Extract contiguous turns per local-speaker channel.
 /// `onset` / `offset` are hysteresis thresholds on the per-frame activity.
-fn extract_turns(
-    activity: &Array2<f32>,
-    frame_dur: f32,
-    onset: f32,
-    offset: f32,
-) -> Vec<Turn> {
+fn extract_turns(activity: &Array2<f32>, frame_dur: f32, onset: f32, offset: f32) -> Vec<Turn> {
     let mut turns = Vec::new();
     for s in 0..activity.shape()[1] {
         let mut active = false;

@@ -818,9 +818,20 @@ async isLaptop() : Promise<Result<boolean, string>> {
 async checkFfmpegAvailable() : Promise<boolean> {
     return await TAURI_INVOKE("check_ffmpeg_available");
 },
-async transcribeMeetingVideo(jobId: string, videoPath: string) : Promise<Result<MeetingResult, string>> {
+async diarizationModelsPresent() : Promise<boolean> {
+    return await TAURI_INVOKE("diarization_models_present");
+},
+async downloadDiarizationModels() : Promise<Result<null, string>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("transcribe_meeting_video", { jobId, videoPath }) };
+    return { status: "ok", data: await TAURI_INVOKE("download_diarization_models") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async transcribeMeetingVideo(jobId: string, videoPath: string, numSpeakers: number | null) : Promise<Result<MeetingResult, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("transcribe_meeting_video", { jobId, videoPath, numSpeakers }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };

@@ -22,6 +22,13 @@
     "title": "Meeting Transcription",
     "subtitle": "Import a video or audio recording, transcribe it, and split it into speaker turns.",
     "language": "Language",
+    "numSpeakers": "Speakers",
+    "numSpeakersHint": "0 = auto-detect",
+    "diarizationModels": "Diarization models",
+    "diarizationReady": "Installed.",
+    "diarizationMissing": "Not installed — speaker labels will be heuristic.",
+    "downloadModels": "Download (~30 MB)",
+    "downloading": "Downloading…",
     "pickFile": "Choose video or audio…",
     "fileFilter": "Media files",
     "working": "Working…",
@@ -29,7 +36,7 @@
     "stageExtract": "Extracting audio…",
     "stageTranscribe": "Transcribing",
     "ffmpegMissing": "ffmpeg is not installed or not on PATH. Install it to transcribe video files (e.g. `brew install ffmpeg`, `apt install ffmpeg`, or download from ffmpeg.org).",
-    "diarizationNote": "Speaker labels are heuristic (gap-based) in this build. Real diarization (pyannote ONNX) is planned."
+    "diarizationNote": "Speaker labels come from pyannote ONNX diarization when models are installed, otherwise from a gap-based heuristic."
   },
   "onboarding": {
     "subtitle": "To get started, choose a transcription model",

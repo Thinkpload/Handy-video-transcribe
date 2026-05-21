@@ -426,6 +426,8 @@ pub fn run(cli_args: CliArgs) {
             commands::history::update_history_limit,
             commands::history::update_recording_retention_period,
             commands::meetings::check_ffmpeg_available,
+            commands::meetings::diarization_models_present,
+            commands::meetings::download_diarization_models,
             commands::meetings::transcribe_meeting_video,
             helpers::clamshell::is_laptop,
         ])

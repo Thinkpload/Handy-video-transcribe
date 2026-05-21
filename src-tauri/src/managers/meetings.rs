@@ -16,6 +16,8 @@ use std::process::{Command, Stdio};
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter};
 
+use crate::audio_toolkit::diarization::{assign_speaker_to_asr, Diarizer};
+use crate::managers::diarization_models;
 use crate::managers::transcription::TranscriptionManager;
 
 pub const SAMPLE_RATE: u32 = 16_000;
@@ -151,11 +153,9 @@ fn find_chunk_bounds(samples: &[f32]) -> Vec<(usize, usize)> {
     bounds
 }
 
-/// Placeholder diarization: assign a new speaker whenever there is a long
-/// inter-segment gap. Real implementation should run pyannote segmentation
-/// + speaker embedding + clustering on `samples` and assign speakers per
-/// time interval, then merge with the transcribed segments.
-fn assign_speakers(segments: &mut [MeetingSegment]) {
+/// Fallback diarization when ONNX models are not present: rotate speaker
+/// labels on long inter-segment gaps.
+fn assign_speakers_heuristic(segments: &mut [MeetingSegment]) {
     let mut speaker_idx = 0u32;
     let mut prev_end = 0.0f32;
     for (i, seg) in segments.iter_mut().enumerate() {
@@ -167,11 +167,32 @@ fn assign_speakers(segments: &mut [MeetingSegment]) {
     }
 }
 
+/// Run pyannote ONNX diarization on the full audio and assign speaker labels
+/// to ASR segments by maximum time overlap.
+fn assign_speakers_pyannote(
+    app: &AppHandle,
+    samples: &[f32],
+    segments: &mut [MeetingSegment],
+    num_speakers: Option<usize>,
+) -> Result<()> {
+    let seg_path = diarization_models::segmentation_path(app)?;
+    let emb_path = diarization_models::embedding_path(app)?;
+    let mut diar = Diarizer::new(&seg_path, &emb_path)?;
+    let turns = diar.diarize(samples, num_speakers)?;
+    log::info!("pyannote diarization produced {} turns", turns.len());
+    for seg in segments.iter_mut() {
+        let spk = assign_speaker_to_asr(&turns, seg.start, seg.end).unwrap_or(0);
+        seg.speaker = format!("Speaker {}", spk + 1);
+    }
+    Ok(())
+}
+
 pub fn transcribe_video(
     app: &AppHandle,
     transcription: &Arc<TranscriptionManager>,
     job_id: String,
     video_path: &Path,
+    num_speakers: Option<usize>,
 ) -> Result<MeetingResult> {
     if !ffmpeg_available() {
         return Err(anyhow!(
@@ -228,7 +249,23 @@ pub fn transcribe_video(
         }
     }
 
-    assign_speakers(&mut segments);
+    if diarization_models::models_present(app) {
+        let _ = app.emit(
+            "meeting-progress",
+            MeetingProgress {
+                job_id: job_id.clone(),
+                stage: "diarize".into(),
+                processed_secs: total_secs,
+                total_secs,
+            },
+        );
+        if let Err(e) = assign_speakers_pyannote(app, &samples, &mut segments, num_speakers) {
+            log::error!("pyannote diarization failed, falling back: {}", e);
+            assign_speakers_heuristic(&mut segments);
+        }
+    } else {
+        assign_speakers_heuristic(&mut segments);
+    }
 
     let _ = app.emit(
         "meeting-progress",

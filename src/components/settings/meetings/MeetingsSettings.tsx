@@ -44,6 +44,9 @@ export function MeetingsSettings() {
   const { settings } = useSettings();
   const currentLang = settings?.selected_language ?? "auto";
   const [ffmpegOk, setFfmpegOk] = useState<boolean | null>(null);
+  const [diarReady, setDiarReady] = useState<boolean | null>(null);
+  const [downloading, setDownloading] = useState(false);
+  const [numSpeakers, setNumSpeakers] = useState<number>(0);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState<Progress | null>(null);
   const [segments, setSegments] = useState<Segment[]>([]);
@@ -53,7 +56,22 @@ export function MeetingsSettings() {
 
   useEffect(() => {
     commands.checkFfmpegAvailable().then(setFfmpegOk).catch(() => setFfmpegOk(false));
+    commands.diarizationModelsPresent().then(setDiarReady).catch(() => setDiarReady(false));
   }, []);
+
+  const onDownloadModels = async () => {
+    setDownloading(true);
+    setError(null);
+    try {
+      const res = await commands.downloadDiarizationModels();
+      if (res.status === "error") setError(res.error);
+      else setDiarReady(true);
+    } catch (e: any) {
+      setError(String(e?.message ?? e));
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   useEffect(() => {
     let unlisten: UnlistenFn | undefined;
@@ -86,7 +104,7 @@ export function MeetingsSettings() {
     const jobId = `meeting-${Date.now()}`;
     jobIdRef.current = jobId;
     try {
-      const res = await commands.transcribeMeetingVideo(jobId, path);
+      const res = await commands.transcribeMeetingVideo(jobId, path, numSpeakers || null);
       if (res.status === "error") {
         setError(res.error);
       } else {
@@ -130,6 +148,26 @@ export function MeetingsSettings() {
         </div>
       )}
 
+      <div className="rounded border border-mid-gray/30 p-3 text-sm flex items-center justify-between gap-3">
+        <div>
+          <div className="font-medium">{t("meetings.diarizationModels")}</div>
+          <div className="opacity-70 text-xs">
+            {diarReady
+              ? t("meetings.diarizationReady")
+              : t("meetings.diarizationMissing")}
+          </div>
+        </div>
+        {!diarReady && (
+          <button
+            onClick={onDownloadModels}
+            disabled={downloading}
+            className="px-3 py-1.5 rounded border border-mid-gray/40 disabled:opacity-50"
+          >
+            {downloading ? t("meetings.downloading") : t("meetings.downloadModels")}
+          </button>
+        )}
+      </div>
+
       <div className="flex gap-2 items-center flex-wrap">
         <label className="text-sm flex items-center gap-2">
           {t("meetings.language")}
@@ -145,6 +183,19 @@ export function MeetingsSettings() {
               </option>
             ))}
           </select>
+        </label>
+        <label className="text-sm flex items-center gap-2">
+          {t("meetings.numSpeakers")}
+          <input
+            type="number"
+            min={0}
+            max={20}
+            value={numSpeakers}
+            disabled={busy}
+            onChange={(e) => setNumSpeakers(Number(e.target.value) || 0)}
+            className="w-16 px-2 py-1 rounded border border-mid-gray/40 bg-transparent text-sm"
+            title={t("meetings.numSpeakersHint")}
+          />
         </label>
         <button
           onClick={onPick}

@@ -11,11 +11,24 @@
   "sidebar": {
     "general": "General",
     "models": "Models",
+    "meetings": "Meetings",
     "advanced": "Advanced",
     "postProcessing": "Post Process",
     "history": "History",
     "debug": "Debug",
     "about": "About"
+  },
+  "meetings": {
+    "title": "Meeting Transcription",
+    "subtitle": "Import a video or audio recording, transcribe it, and split it into speaker turns.",
+    "pickFile": "Choose video or audio…",
+    "fileFilter": "Media files",
+    "working": "Working…",
+    "exportTxt": "Export .txt",
+    "stageExtract": "Extracting audio…",
+    "stageTranscribe": "Transcribing",
+    "ffmpegMissing": "ffmpeg is not installed or not on PATH. Install it to transcribe video files (e.g. `brew install ffmpeg`, `apt install ffmpeg`, or download from ffmpeg.org).",
+    "diarizationNote": "Speaker labels are heuristic (gap-based) in this build. Real diarization (pyannote ONNX) is planned."
   },
   "onboarding": {
     "subtitle": "To get started, choose a transcription model",

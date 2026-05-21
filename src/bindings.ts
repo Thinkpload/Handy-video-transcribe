@@ -814,6 +814,17 @@ async isLaptop() : Promise<Result<boolean, string>> {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
+},
+async checkFfmpegAvailable() : Promise<boolean> {
+    return await TAURI_INVOKE("check_ffmpeg_available");
+},
+async transcribeMeetingVideo(jobId: string, videoPath: string) : Promise<Result<MeetingResult, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("transcribe_meeting_video", { jobId, videoPath }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
 }
 }
 
@@ -856,6 +867,9 @@ export type LLMPrompt = { id: string; name: string; prompt: string }
 export type LogLevel = "trace" | "debug" | "info" | "warn" | "error"
 export type ModelInfo = { id: string; name: string; description: string; filename: string; url: string | null; sha256: string | null; size_mb: number; is_downloaded: boolean; is_downloading: boolean; partial_size: number; is_directory: boolean; engine_type: EngineType; accuracy_score: number; speed_score: number; supports_translation: boolean; is_recommended: boolean; supported_languages: string[]; supports_language_selection: boolean; is_custom: boolean }
 export type ModelLoadStatus = { is_loaded: boolean; current_model: string | null }
+export type MeetingSegment = { start: number; end: number; speaker: string; text: string }
+export type MeetingProgress = { job_id: string; stage: string; processed_secs: number; total_secs: number }
+export type MeetingResult = { job_id: string; duration_secs: number; segments: MeetingSegment[] }
 export type ModelUnloadTimeout = "never" | "immediately" | "min_2" | "min_5" | "min_10" | "min_15" | "hour_1" | "sec_15"
 export type OrtAcceleratorSetting = "auto" | "cpu" | "cuda" | "directml" | "rocm"
 export type OverlayPosition = "none" | "top" | "bottom"

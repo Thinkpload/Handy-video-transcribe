@@ -130,6 +130,23 @@ Settings are stored using Tauri's store plugin with reactive updates:
 
 The app enforces single instance behavior — launching when already running brings the settings window to front rather than creating a new process. Remote control flags (`--toggle-transcription`, etc.) work by launching a second instance that sends args to the running instance via `tauri_plugin_single_instance`, then exits.
 
+## Meetings feature (fork-only)
+
+This fork (`thinkpload/handy-video-transcribe`) adds a **Meetings** workflow
+on top of upstream Handy: import a video/audio file, transcribe with chunked
+Whisper, run pyannote ONNX diarization, persist to SQLite, export to
+TXT/SRT/VTT/MD/JSON. Full details in [MEETINGS.md](MEETINGS.md). Key paths:
+
+- Pipeline: `src-tauri/src/managers/meetings.rs`
+- Diarization: `src-tauri/src/audio_toolkit/diarization/{mod,cluster}.rs`
+- Storage: `src-tauri/src/managers/meetings_store.rs` (`meetings.db`)
+- Model download: `src-tauri/src/managers/diarization_models.rs`
+- Commands: `src-tauri/src/commands/meetings.rs`
+- UI: `src/components/settings/meetings/`
+
+External requirements: `ffmpeg` on PATH; diarization ONNX models downloaded
+on first use into `<app_data>/models/diarization/`.
+
 ## Internationalization (i18n)
 
 All user-facing strings must use i18next translations. ESLint enforces this (no hardcoded strings in JSX).

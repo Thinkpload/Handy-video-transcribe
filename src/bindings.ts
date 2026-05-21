@@ -814,6 +814,55 @@ async isLaptop() : Promise<Result<boolean, string>> {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
+},
+async checkFfmpegAvailable() : Promise<boolean> {
+    return await TAURI_INVOKE("check_ffmpeg_available");
+},
+async diarizationModelsPresent() : Promise<boolean> {
+    return await TAURI_INVOKE("diarization_models_present");
+},
+async downloadDiarizationModels() : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("download_diarization_models") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async transcribeMeetingVideo(jobId: string, videoPath: string, numSpeakers: number | null) : Promise<Result<MeetingResult, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("transcribe_meeting_video", { jobId, videoPath, numSpeakers }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async cancelMeetingJob(jobId: string) : Promise<boolean> {
+    return await TAURI_INVOKE("cancel_meeting_job", { jobId });
+},
+async listMeetings() : Promise<Result<MeetingSummary[], string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("list_meetings") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async getMeeting(id: number) : Promise<Result<StoredMeeting | null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_meeting", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async deleteMeeting(id: number) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("delete_meeting", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
 }
 }
 
@@ -856,6 +905,11 @@ export type LLMPrompt = { id: string; name: string; prompt: string }
 export type LogLevel = "trace" | "debug" | "info" | "warn" | "error"
 export type ModelInfo = { id: string; name: string; description: string; filename: string; url: string | null; sha256: string | null; size_mb: number; is_downloaded: boolean; is_downloading: boolean; partial_size: number; is_directory: boolean; engine_type: EngineType; accuracy_score: number; speed_score: number; supports_translation: boolean; is_recommended: boolean; supported_languages: string[]; supports_language_selection: boolean; is_custom: boolean }
 export type ModelLoadStatus = { is_loaded: boolean; current_model: string | null }
+export type MeetingSegment = { start: number; end: number; speaker: string; text: string }
+export type MeetingProgress = { job_id: string; stage: string; processed_secs: number; total_secs: number }
+export type MeetingResult = { job_id: string; duration_secs: number; segments: MeetingSegment[] }
+export type MeetingSummary = { id: number; created_at: number; file_name: string; source_path: string; language: string; duration_secs: number; segment_count: number; speaker_count: number }
+export type StoredMeeting = { id: number; created_at: number; file_name: string; source_path: string; language: string; duration_secs: number; segments: MeetingSegment[] }
 export type ModelUnloadTimeout = "never" | "immediately" | "min_2" | "min_5" | "min_10" | "min_15" | "hour_1" | "sec_15"
 export type OrtAcceleratorSetting = "auto" | "cpu" | "cuda" | "directml" | "rocm"
 export type OverlayPosition = "none" | "top" | "bottom"

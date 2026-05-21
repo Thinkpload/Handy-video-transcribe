@@ -2,6 +2,12 @@
 
 [![Discord](https://img.shields.io/badge/Discord-%235865F2.svg?style=for-the-badge&logo=discord&logoColor=white)](https://discord.com/invite/WVBeWsNXK4)
 
+> **Fork notice — `thinkpload/handy-video-transcribe`.** This fork adds a
+> **Meetings** tab for transcribing long pre-recorded meeting videos with
+> speaker diarization. See [MEETINGS.md](MEETINGS.md) for setup, usage,
+> architecture, and limitations. The original real-time dictation features
+> below are unchanged.
+
 **A free, open source, and extensible speech-to-text application that works completely offline.**
 
 Handy is a cross-platform desktop application that provides simple, privacy-focused speech transcription. Press a shortcut, speak, and have your words appear in any text field. This happens on your own computer without sending any information to the cloud.

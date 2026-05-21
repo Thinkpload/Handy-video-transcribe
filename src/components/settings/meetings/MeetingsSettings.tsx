@@ -115,9 +115,20 @@ export function MeetingsSettings() {
       multiple: false,
       filters: [
         {
-          name: t("meetings.fileFilter"),
-          extensions: ["mp4", "mkv", "mov", "webm", "avi", "m4a", "mp3", "wav", "flac", "ogg"],
+          name: t("meetings.fileFilterVideo"),
+          extensions: [
+            "mp4", "mkv", "mov", "webm", "avi", "wmv", "flv", "mpg", "mpeg",
+            "ts", "m2ts", "mts", "3gp", "f4v", "vob", "ogv", "mxf", "asf",
+          ],
         },
+        {
+          name: t("meetings.fileFilterAudio"),
+          extensions: [
+            "mp3", "m4a", "wav", "flac", "ogg", "oga", "opus", "aac", "wma",
+            "aiff", "aif", "ac3", "amr", "caf", "dts", "mka", "mp2",
+          ],
+        },
+        { name: t("meetings.fileFilterAll"), extensions: ["*"] },
       ],
     });
     if (!picked || typeof picked !== "string") return;

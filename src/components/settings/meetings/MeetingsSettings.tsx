@@ -131,7 +131,11 @@ export function MeetingsSettings() {
     try {
       const res = await commands.transcribeMeetingVideo(jobId, path, numSpeakers || null);
       if (res.status === "error") {
-        setError(res.error);
+        if (res.error.toLowerCase().includes("cancelled")) {
+          setError(null);
+        } else {
+          setError(res.error);
+        }
       } else {
         setSegments(res.data.segments);
         refreshSaved();
@@ -221,6 +225,16 @@ export function MeetingsSettings() {
         >
           {busy ? t("meetings.working") : t("meetings.pickFile")}
         </button>
+        {busy && (
+          <button
+            onClick={() => {
+              if (jobIdRef.current) commands.cancelMeetingJob(jobIdRef.current);
+            }}
+            className="px-3 py-2 rounded border border-red-500/50 text-red-500 text-sm"
+          >
+            {t("meetings.cancel")}
+          </button>
+        )}
         {segments.length > 0 && (
           <div className="flex gap-1">
             {(["txt", "srt", "vtt", "md", "json"] as ExportFormat[]).map((f) => (

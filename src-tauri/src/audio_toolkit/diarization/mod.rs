@@ -22,6 +22,7 @@ use anyhow::{anyhow, Context, Result};
 use ndarray::{Array1, Array2, Array3, ArrayView2, Axis};
 use ort::session::{builder::GraphOptimizationLevel, Session};
 use std::path::Path;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 pub mod cluster;
 
@@ -95,6 +96,7 @@ impl Diarizer {
         &mut self,
         samples: &[f32],
         num_speakers: Option<usize>,
+        cancel: &AtomicBool,
     ) -> Result<Vec<DiarSegment>> {
         if samples.is_empty() {
             return Ok(Vec::new());
@@ -102,7 +104,7 @@ impl Diarizer {
 
         // 1+2+3: run sliding-window segmentation and stitch into a global activity
         //         matrix [total_frames, MAX_LOCAL_SPEAKERS].
-        let (activity, frame_dur) = self.run_segmentation(samples)?;
+        let (activity, frame_dur) = self.run_segmentation(samples, cancel)?;
 
         // 4: extract contiguous turns per local-speaker channel.
         let turns = extract_turns(&activity, frame_dur, 0.5, 0.2);
@@ -114,6 +116,9 @@ impl Diarizer {
         // 5: embeddings per turn.
         let mut embeddings: Vec<Array1<f32>> = Vec::with_capacity(turns.len());
         for t in &turns {
+            if cancel.load(Ordering::Relaxed) {
+                return Err(anyhow!("Cancelled"));
+            }
             let s = (t.start * SAMPLE_RATE as f32) as usize;
             let e = ((t.end * SAMPLE_RATE as f32) as usize).min(samples.len());
             if e <= s + SAMPLE_RATE / 4 {
@@ -144,7 +149,11 @@ impl Diarizer {
 
     /// Run segmentation across the audio with overlap-add stitching.
     /// Returns (activity matrix [total_frames, MAX_LOCAL_SPEAKERS], frame_duration_secs).
-    fn run_segmentation(&mut self, samples: &[f32]) -> Result<(Array2<f32>, f32)> {
+    fn run_segmentation(
+        &mut self,
+        samples: &[f32],
+        cancel: &AtomicBool,
+    ) -> Result<(Array2<f32>, f32)> {
         let frame_dur = SEG_WINDOW_SECS / SEG_NUM_FRAMES as f32;
         let frames_per_step = (SEG_STEP_SAMPLES as f32 / SAMPLE_RATE as f32 / frame_dur) as usize;
         let total_secs = samples.len() as f32 / SAMPLE_RATE as f32;
@@ -155,6 +164,9 @@ impl Diarizer {
 
         let mut start = 0usize;
         while start < samples.len() {
+            if cancel.load(Ordering::Relaxed) {
+                return Err(anyhow!("Cancelled"));
+            }
             let end = (start + SEG_WINDOW_SAMPLES).min(samples.len());
             // Pad the window with zeros if shorter than expected.
             let mut window = vec![0.0f32; SEG_WINDOW_SAMPLES];

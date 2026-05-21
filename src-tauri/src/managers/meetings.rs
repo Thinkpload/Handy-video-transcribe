@@ -16,9 +16,20 @@ use std::process::{Command, Stdio};
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter};
 
+use std::sync::atomic::{AtomicBool, Ordering};
+
 use crate::audio_toolkit::diarization::{assign_speaker_to_asr, Diarizer};
 use crate::managers::diarization_models;
 use crate::managers::transcription::TranscriptionManager;
+
+/// Returned by every cancellation check; mapped to a user-visible error.
+fn cancelled() -> anyhow::Error {
+    anyhow!("Cancelled")
+}
+
+pub fn is_cancelled_error(e: &anyhow::Error) -> bool {
+    e.to_string() == "Cancelled"
+}
 
 pub const SAMPLE_RATE: u32 = 16_000;
 const CHUNK_TARGET_SECS: f32 = 28.0;
@@ -65,7 +76,11 @@ pub fn ffmpeg_available() -> bool {
 ///
 /// Diarization needs the full waveform so we still accumulate to a Vec, but
 /// the read happens incrementally rather than blocking on `read_to_end`.
-fn extract_pcm<F: FnMut(usize)>(input: &Path, mut on_progress: F) -> Result<Vec<f32>> {
+fn extract_pcm<F: FnMut(usize)>(
+    input: &Path,
+    cancel: &AtomicBool,
+    mut on_progress: F,
+) -> Result<Vec<f32>> {
     let mut child = Command::new("ffmpeg")
         .args(["-nostdin", "-hide_banner", "-loglevel", "error", "-i"])
         .arg(input)
@@ -92,6 +107,10 @@ fn extract_pcm<F: FnMut(usize)>(input: &Path, mut on_progress: F) -> Result<Vec<
     let mut last_reported_s: usize = 0;
 
     loop {
+        if cancel.load(Ordering::Relaxed) {
+            let _ = child.kill();
+            return Err(cancelled());
+        }
         let n = stdout.read(&mut buf)?;
         if n == 0 {
             break;
@@ -213,11 +232,12 @@ fn assign_speakers_pyannote(
     samples: &[f32],
     segments: &mut [MeetingSegment],
     num_speakers: Option<usize>,
+    cancel: &AtomicBool,
 ) -> Result<()> {
     let seg_path = diarization_models::segmentation_path(app)?;
     let emb_path = diarization_models::embedding_path(app)?;
     let mut diar = Diarizer::new(&seg_path, &emb_path)?;
-    let turns = diar.diarize(samples, num_speakers)?;
+    let turns = diar.diarize(samples, num_speakers, cancel)?;
     log::info!("pyannote diarization produced {} turns", turns.len());
     for seg in segments.iter_mut() {
         let spk = assign_speaker_to_asr(&turns, seg.start, seg.end).unwrap_or(0);
@@ -232,6 +252,7 @@ pub fn transcribe_video(
     job_id: String,
     video_path: &Path,
     num_speakers: Option<usize>,
+    cancel: Arc<AtomicBool>,
 ) -> Result<MeetingResult> {
     if !ffmpeg_available() {
         return Err(anyhow!(
@@ -252,7 +273,7 @@ pub fn transcribe_video(
     let samples = {
         let app_for_cb = app.clone();
         let job_id_for_cb = job_id.clone();
-        extract_pcm(video_path, |samples_so_far| {
+        extract_pcm(video_path, &cancel, |samples_so_far| {
             let secs = samples_so_far as f32 / SAMPLE_RATE as f32;
             let _ = app_for_cb.emit(
                 "meeting-progress",
@@ -271,6 +292,9 @@ pub fn transcribe_video(
     let mut segments: Vec<MeetingSegment> = Vec::with_capacity(bounds.len());
 
     for (start, end) in bounds {
+        if cancel.load(Ordering::Relaxed) {
+            return Err(cancelled());
+        }
         let start_secs = start as f32 / SAMPLE_RATE as f32;
         let end_secs = end as f32 / SAMPLE_RATE as f32;
 
@@ -313,9 +337,13 @@ pub fn transcribe_video(
                 total_secs,
             },
         );
-        if let Err(e) = assign_speakers_pyannote(app, &samples, &mut segments, num_speakers) {
-            log::error!("pyannote diarization failed, falling back: {}", e);
-            assign_speakers_heuristic(&mut segments);
+        match assign_speakers_pyannote(app, &samples, &mut segments, num_speakers, &cancel) {
+            Ok(()) => {}
+            Err(e) if is_cancelled_error(&e) => return Err(e),
+            Err(e) => {
+                log::error!("pyannote diarization failed, falling back: {}", e);
+                assign_speakers_heuristic(&mut segments);
+            }
         }
     } else {
         assign_speakers_heuristic(&mut segments);

@@ -75,6 +75,11 @@ The meeting is **auto-saved** to `meetings.db` when transcription succeeds.
 Saved meetings appear in the list above the transcript view; click to open,
 ✕ to delete.
 
+A **Cancel** button appears next to the picker while a job is running. It
+signals the in-flight pipeline cooperatively — the ffmpeg subprocess is
+killed, the next chunk / window is skipped, and the job returns. Partial
+results are discarded (nothing is saved to `meetings.db`).
+
 ---
 
 ## Export formats
@@ -196,6 +201,7 @@ Migrations follow the same `rusqlite_migration` pattern as the existing
 | `diarization_models_present`     | Returns `bool`.                                                    |
 | `download_diarization_models`    | Async. Downloads the two ONNX files if missing.                    |
 | `transcribe_meeting_video`       | Async. Runs the full pipeline; auto-saves to `meetings.db`.        |
+| `cancel_meeting_job`             | Sets the cancel flag for an in-flight `job_id`; pipeline aborts.   |
 | `list_meetings`                  | `Vec<MeetingSummary>` ordered newest first.                        |
 | `get_meeting`                    | `Option<StoredMeeting>` by id.                                     |
 | `delete_meeting`                 | Removes the row.                                                   |
@@ -244,17 +250,15 @@ brings in — bump if Cargo complains about version unification.
    the whole audio. A 2-hour meeting is ~460 MB of f32. Multi-hour recordings
    may be a problem on low-RAM machines. Streaming diarization is a possible
    future improvement.
-3. **No cancellation** of an in-flight transcription job. The only way to
-   stop a 2-hour job in progress is to quit the app.
-4. **ffmpeg is not bundled.** Cross-platform sidecar packaging is a separate
+3. **ffmpeg is not bundled.** Cross-platform sidecar packaging is a separate
    piece of work (involves `tauri.conf.json` externalBin entries and CI
    plumbing).
-5. **No edit / merge speakers UI.** If the cluster count is wrong you re-run
+4. **No edit / merge speakers UI.** If the cluster count is wrong you re-run
    the transcription with an explicit `Speakers` value rather than fixing
    labels by hand.
-6. **i18n.** Only English strings were added for the new feature. Other
+5. **i18n.** Only English strings were added for the new feature. Other
    locales fall back to English.
-7. **Real-time dictation flow is untouched.** All upstream Handy features
+6. **Real-time dictation flow is untouched.** All upstream Handy features
    continue to work; Meetings lives in its own tab and uses its own SQLite
    database and storage location.
 
@@ -274,9 +278,6 @@ Common extensions, in rough order of cost:
   Add per-platform binaries under `src-tauri/binaries/`, update
   `tauri.conf.json`, and replace `Command::new("ffmpeg")` with the
   sidecar-aware launcher.
-- **Cancellation** — add an `AtomicBool` keyed by `job_id` into a shared
-  registry, check it between chunks in `transcribe_video`, expose a
-  `cancel_meeting` command.
 - **Search saved meetings** — `segments_json` already contains the text;
   either filter client-side over `list_meetings` or add an FTS5 virtual
   table mirroring the segments.

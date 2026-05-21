@@ -3,6 +3,7 @@ use std::sync::Arc;
 use tauri::AppHandle;
 
 use crate::managers::diarization_models;
+use crate::managers::meeting_jobs::MeetingJobs;
 use crate::managers::meetings::{self, MeetingResult};
 use crate::managers::meetings_store::{MeetingSummary, MeetingsStore, StoredMeeting};
 use crate::managers::transcription::TranscriptionManager;
@@ -54,14 +55,31 @@ pub async fn transcribe_meeting_video(
         .unwrap_or_else(|| video_path.clone());
     let source_path = video_path.clone();
 
+    let jobs = tauri::Manager::state::<Arc<MeetingJobs>>(&app)
+        .inner()
+        .clone();
+    let cancel = jobs.register(&job_id);
+
     let app_for_job = app.clone();
     let path_for_job = path.clone();
-    let result: MeetingResult = tauri::async_runtime::spawn_blocking(move || {
-        meetings::transcribe_video(&app_for_job, &transcription, job_id, &path_for_job, num)
-    })
-    .await
-    .map_err(|e| format!("join error: {}", e))?
-    .map_err(|e| e.to_string())?;
+    let job_id_for_job = job_id.clone();
+    let result_res: Result<MeetingResult, String> =
+        tauri::async_runtime::spawn_blocking(move || {
+            meetings::transcribe_video(
+                &app_for_job,
+                &transcription,
+                job_id_for_job,
+                &path_for_job,
+                num,
+                cancel,
+            )
+        })
+        .await
+        .map_err(|e| format!("join error: {}", e))?
+        .map_err(|e| e.to_string());
+
+    jobs.done(&job_id);
+    let result = result_res?;
 
     if let Some(store) = store {
         if let Err(e) = store.save(&source_path, &file_name, &language, &result) {
@@ -69,6 +87,12 @@ pub async fn transcribe_meeting_video(
         }
     }
     Ok(result)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn cancel_meeting_job(app: AppHandle, job_id: String) -> bool {
+    tauri::Manager::state::<Arc<MeetingJobs>>(&app).cancel(&job_id)
 }
 
 #[tauri::command]

@@ -169,6 +169,7 @@ fn initialize_core_logic(app_handle: &AppHandle) {
         Ok(store) => app_handle.manage(Arc::new(store)),
         Err(e) => log::error!("Failed to initialise meetings store: {}", e),
     }
+    app_handle.manage(Arc::new(managers::meeting_jobs::MeetingJobs::default()));
 
     // Note: Shortcuts are NOT initialized here.
     // The frontend is responsible for calling the `initialize_shortcuts` command
@@ -434,6 +435,7 @@ pub fn run(cli_args: CliArgs) {
             commands::meetings::diarization_models_present,
             commands::meetings::download_diarization_models,
             commands::meetings::transcribe_meeting_video,
+            commands::meetings::cancel_meeting_job,
             commands::meetings::list_meetings,
             commands::meetings::get_meeting,
             commands::meetings::delete_meeting,

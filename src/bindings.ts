@@ -837,6 +837,9 @@ async transcribeMeetingVideo(jobId: string, videoPath: string, numSpeakers: numb
     else return { status: "error", error: e  as any };
 }
 },
+async cancelMeetingJob(jobId: string) : Promise<boolean> {
+    return await TAURI_INVOKE("cancel_meeting_job", { jobId });
+},
 async listMeetings() : Promise<Result<MeetingSummary[], string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("list_meetings") };

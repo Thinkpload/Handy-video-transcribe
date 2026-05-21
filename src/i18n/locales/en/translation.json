@@ -32,6 +32,7 @@
     "pickFile": "Choose video or audio…",
     "fileFilter": "Media files",
     "working": "Working…",
+    "cancel": "Cancel",
     "exportTxt": "Export .txt",
     "savedHeading": "Saved meetings",
     "speakersShort": "spk",

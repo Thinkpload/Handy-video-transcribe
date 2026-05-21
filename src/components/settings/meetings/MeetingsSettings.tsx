@@ -3,6 +3,19 @@ import { useTranslation } from "react-i18next";
 import { open } from "@tauri-apps/plugin-dialog";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { commands } from "@/bindings";
+import { useSettings } from "@/hooks/useSettings";
+
+const LANGUAGES: { code: string; label: string }[] = [
+  { code: "auto", label: "Auto-detect" },
+  { code: "en", label: "English" },
+  { code: "ru", label: "Русский" },
+  { code: "es", label: "Español" },
+  { code: "de", label: "Deutsch" },
+  { code: "fr", label: "Français" },
+  { code: "uk", label: "Українська" },
+  { code: "zh", label: "中文" },
+  { code: "ja", label: "日本語" },
+];
 
 type Segment = {
   start: number;
@@ -28,6 +41,8 @@ function formatTime(secs: number): string {
 
 export function MeetingsSettings() {
   const { t } = useTranslation();
+  const { settings } = useSettings();
+  const currentLang = settings?.selected_language ?? "auto";
   const [ffmpegOk, setFfmpegOk] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState<Progress | null>(null);
@@ -115,7 +130,22 @@ export function MeetingsSettings() {
         </div>
       )}
 
-      <div className="flex gap-2 items-center">
+      <div className="flex gap-2 items-center flex-wrap">
+        <label className="text-sm flex items-center gap-2">
+          {t("meetings.language")}
+          <select
+            value={currentLang}
+            disabled={busy}
+            onChange={(e) => commands.changeSelectedLanguageSetting(e.target.value)}
+            className="px-2 py-1 rounded border border-mid-gray/40 bg-transparent text-sm"
+          >
+            {LANGUAGES.map((l) => (
+              <option key={l.code} value={l.code}>
+                {l.label}
+              </option>
+            ))}
+          </select>
+        </label>
         <button
           onClick={onPick}
           disabled={busy || ffmpegOk === false}

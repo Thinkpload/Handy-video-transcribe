@@ -21,6 +21,7 @@
   "meetings": {
     "title": "Meeting Transcription",
     "subtitle": "Import a video or audio recording, transcribe it, and split it into speaker turns.",
+    "language": "Language",
     "pickFile": "Choose video or audio…",
     "fileFilter": "Media files",
     "working": "Working…",

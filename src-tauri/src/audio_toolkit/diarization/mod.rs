@@ -20,6 +20,8 @@
 
 use anyhow::{anyhow, Context, Result};
 use ndarray::{Array1, Array2, Array3, ArrayView2, Axis};
+#[allow(unused_imports)]
+use knf_rs;
 use ort::session::{builder::GraphOptimizationLevel, Session};
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -240,9 +242,13 @@ impl Diarizer {
     }
 
     fn embed(&mut self, samples: &[f32]) -> Result<Array1<f32>> {
-        // Many wespeaker ONNX exports want [batch, num_samples] f32 mono 16kHz.
-        let input = Array2::from_shape_vec((1, samples.len()), samples.to_vec())?;
-        let input_value = ort::value::Tensor::<f32>::from_array(input)?;
+        // Compute 80-dim log-fbank features (kaldi-style) then pass [1, T, 80] to the model.
+        let fbank = knf_rs::compute_fbank(samples).map_err(|e| anyhow::anyhow!("{e}"))?;
+        let shape = fbank.shape().to_vec();
+        let features = Array2::<f32>::from_shape_vec((shape[0], shape[1]), fbank.into_raw_vec())
+            .map_err(|e| anyhow::anyhow!("{e}"))?;
+        let features = features.insert_axis(Axis(0));
+        let input_value = ort::value::Tensor::<f32>::from_array(features)?;
         let outputs = self.embedding.run(ort::inputs![
             self.emb_input_name.as_str() => input_value
         ])?;

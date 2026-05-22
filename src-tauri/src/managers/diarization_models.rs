@@ -17,7 +17,7 @@ use tauri::AppHandle;
 const SEG_URL: &str =
     "https://huggingface.co/onnx-community/pyannote-segmentation-3.0/resolve/main/onnx/model.onnx";
 const EMB_URL: &str =
-    "https://huggingface.co/deepghs/pyannote-wespeaker-voxceleb-resnet34-LM/resolve/main/speaker-embedding.onnx";
+    "https://github.com/thewh1teagle/pyannote-rs/releases/download/v0.1.0/wespeaker_en_voxceleb_CAM++.onnx";
 
 pub fn diarization_dir(app: &AppHandle) -> Result<PathBuf> {
     let dir = crate::portable::app_data_dir(app)

@@ -801,20 +801,6 @@ async updateRecordingRetentionPeriod(period: string) : Promise<Result<null, stri
     else return { status: "error", error: e  as any };
 }
 },
-/**
- * Checks if the Mac is a laptop by detecting battery presence
- * 
- * This uses pmset to check for battery information.
- * Returns true if a battery is detected (laptop), false otherwise (desktop)
- */
-async isLaptop() : Promise<Result<boolean, string>> {
-    try {
-    return { status: "ok", data: await TAURI_INVOKE("is_laptop") };
-} catch (e) {
-    if(e instanceof Error) throw e;
-    else return { status: "error", error: e  as any };
-}
-},
 async checkFfmpegAvailable() : Promise<boolean> {
     return await TAURI_INVOKE("check_ffmpeg_available");
 },
@@ -863,6 +849,18 @@ async deleteMeeting(id: number) : Promise<Result<null, string>> {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
+},
+/**
+ * Stub implementation for non-macOS platforms
+ * Always returns false since laptop detection is macOS-specific
+ */
+async isLaptop() : Promise<Result<boolean, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("is_laptop") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
 }
 }
 
@@ -903,13 +901,11 @@ reset_bindings: string[] }
 export type KeyboardImplementation = "tauri" | "handy_keys"
 export type LLMPrompt = { id: string; name: string; prompt: string }
 export type LogLevel = "trace" | "debug" | "info" | "warn" | "error"
+export type MeetingResult = { job_id: string; duration_secs: number; segments: MeetingSegment[] }
+export type MeetingSegment = { start: number; end: number; speaker: string; text: string }
+export type MeetingSummary = { id: number; created_at: number; file_name: string; source_path: string; language: string; duration_secs: number; segment_count: number; speaker_count: number }
 export type ModelInfo = { id: string; name: string; description: string; filename: string; url: string | null; sha256: string | null; size_mb: number; is_downloaded: boolean; is_downloading: boolean; partial_size: number; is_directory: boolean; engine_type: EngineType; accuracy_score: number; speed_score: number; supports_translation: boolean; is_recommended: boolean; supported_languages: string[]; supports_language_selection: boolean; is_custom: boolean }
 export type ModelLoadStatus = { is_loaded: boolean; current_model: string | null }
-export type MeetingSegment = { start: number; end: number; speaker: string; text: string }
-export type MeetingProgress = { job_id: string; stage: string; processed_secs: number; total_secs: number }
-export type MeetingResult = { job_id: string; duration_secs: number; segments: MeetingSegment[] }
-export type MeetingSummary = { id: number; created_at: number; file_name: string; source_path: string; language: string; duration_secs: number; segment_count: number; speaker_count: number }
-export type StoredMeeting = { id: number; created_at: number; file_name: string; source_path: string; language: string; duration_secs: number; segments: MeetingSegment[] }
 export type ModelUnloadTimeout = "never" | "immediately" | "min_2" | "min_5" | "min_10" | "min_15" | "hour_1" | "sec_15"
 export type OrtAcceleratorSetting = "auto" | "cpu" | "cuda" | "directml" | "rocm"
 export type OverlayPosition = "none" | "top" | "bottom"
@@ -921,6 +917,7 @@ export type RecordingRetentionPeriod = "never" | "preserve_limit" | "days_3" | "
 export type SecretMap = Partial<{ [key in string]: string }>
 export type ShortcutBinding = { id: string; name: string; description: string; default_binding: string; current_binding: string }
 export type SoundTheme = "marimba" | "pop" | "custom"
+export type StoredMeeting = { id: number; created_at: number; file_name: string; source_path: string; language: string; duration_secs: number; segments: MeetingSegment[] }
 export type TypingTool = "auto" | "wtype" | "kwtype" | "dotool" | "ydotool" | "xdotool"
 export type WhisperAcceleratorSetting = "auto" | "cpu" | "gpu"
 export type WindowsMicrophonePermissionStatus = { supported: boolean; overall_access: PermissionAccess; device_access: PermissionAccess; app_access: PermissionAccess; desktop_app_access: PermissionAccess }

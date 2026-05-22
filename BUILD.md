@@ -22,6 +22,25 @@ This guide covers how to set up the development environment and build Handy from
 - Microsoft C++ Build Tools
 - Visual Studio 2019/2022 with C++ development tools
 - Or Visual Studio Build Tools 2019/2022
+- Vulkan SDK (https://vulkan.lunarg.com/sdk/home#windows) — required for whisper.cpp Vulkan backend
+- Ninja (`winget install Ninja-build.Ninja`) — generator used by the cmake crate
+- LLVM/Clang (`winget install LLVM.LLVM`) — `libclang.dll` for bindgen
+
+**Recommended dev workflow (this fork):** the helper script
+[`scripts/dev-env.ps1`](scripts/dev-env.ps1) loads the MSVC Dev Shell, sets a
+short `CARGO_TARGET_DIR` (avoids MAX_PATH errors in nested whisper.cpp build
+paths), and selects the Ninja generator. Dot-source it once per session:
+
+```powershell
+. .\scripts\dev-env.ps1
+bun run tauri dev
+```
+
+Or run a one-shot:
+
+```powershell
+.\scripts\dev-env.ps1 -Run 'bun run tauri dev'
+```
 
 #### Linux
 

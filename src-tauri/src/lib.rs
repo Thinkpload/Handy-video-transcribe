@@ -166,7 +166,7 @@ fn initialize_core_logic(app_handle: &AppHandle) {
     app_handle.manage(history_manager.clone());
 
     match managers::meetings_store::MeetingsStore::new(app_handle) {
-        Ok(store) => app_handle.manage(Arc::new(store)),
+        Ok(store) => { app_handle.manage(Arc::new(store)); }
         Err(e) => log::error!("Failed to initialise meetings store: {}", e),
     }
     app_handle.manage(Arc::new(managers::meeting_jobs::MeetingJobs::default()));

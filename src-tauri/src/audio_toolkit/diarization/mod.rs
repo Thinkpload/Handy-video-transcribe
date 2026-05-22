@@ -60,19 +60,23 @@ pub struct Diarizer {
 
 impl Diarizer {
     pub fn new(seg_path: &Path, emb_path: &Path) -> Result<Self> {
-        let segmentation = Session::builder()?
-            .with_optimization_level(GraphOptimizationLevel::Level3)?
+        let segmentation = Session::builder()
+            .map_err(|e| anyhow::anyhow!(e.to_string()))?
+            .with_optimization_level(GraphOptimizationLevel::Level3)
+            .map_err(|e| anyhow::anyhow!(e.to_string()))?
             .commit_from_file(seg_path)
             .with_context(|| format!("loading segmentation model {}", seg_path.display()))?;
-        let embedding = Session::builder()?
-            .with_optimization_level(GraphOptimizationLevel::Level3)?
+        let embedding = Session::builder()
+            .map_err(|e| anyhow::anyhow!(e.to_string()))?
+            .with_optimization_level(GraphOptimizationLevel::Level3)
+            .map_err(|e| anyhow::anyhow!(e.to_string()))?
             .commit_from_file(emb_path)
             .with_context(|| format!("loading embedding model {}", emb_path.display()))?;
 
-        let seg_input_name = segmentation.inputs[0].name.clone();
-        let seg_output_name = segmentation.outputs[0].name.clone();
-        let emb_input_name = embedding.inputs[0].name.clone();
-        let emb_output_name = embedding.outputs[0].name.clone();
+        let seg_input_name = segmentation.inputs()[0].name().to_string();
+        let seg_output_name = segmentation.outputs()[0].name().to_string();
+        let emb_input_name = embedding.inputs()[0].name().to_string();
+        let emb_output_name = embedding.outputs()[0].name().to_string();
 
         log::info!(
             "Diarizer loaded: seg in={} out={}, emb in={} out={}",
@@ -173,12 +177,14 @@ impl Diarizer {
             window[..end - start].copy_from_slice(&samples[start..end]);
 
             let input = Array3::from_shape_vec((1, 1, SEG_WINDOW_SAMPLES), window)?;
+            let input_value = ort::value::Tensor::<f32>::from_array(input)?;
             let outputs = self.segmentation.run(ort::inputs![
-                self.seg_input_name.as_str() => input.view()
-            ]?)?;
+                self.seg_input_name.as_str() => input_value
+            ])?;
             let logits = outputs[self.seg_output_name.as_str()]
-                .try_extract_tensor::<f32>()?
-                .into_dimensionality::<ndarray::Ix3>()?;
+                .try_extract_array::<f32>()?
+                .into_dimensionality::<ndarray::Ix3>()?
+                .to_owned();
             // shape: [1, num_frames, 7]
             let frames = logits.shape()[1];
             let classes = logits.shape()[2];
@@ -236,12 +242,14 @@ impl Diarizer {
     fn embed(&mut self, samples: &[f32]) -> Result<Array1<f32>> {
         // Many wespeaker ONNX exports want [batch, num_samples] f32 mono 16kHz.
         let input = Array2::from_shape_vec((1, samples.len()), samples.to_vec())?;
+        let input_value = ort::value::Tensor::<f32>::from_array(input)?;
         let outputs = self.embedding.run(ort::inputs![
-            self.emb_input_name.as_str() => input.view()
-        ]?)?;
+            self.emb_input_name.as_str() => input_value
+        ])?;
         let emb = outputs[self.emb_output_name.as_str()]
-            .try_extract_tensor::<f32>()?
-            .into_dimensionality::<ndarray::Ix2>()?;
+            .try_extract_array::<f32>()?
+            .into_dimensionality::<ndarray::Ix2>()?
+            .to_owned();
         let v = emb.index_axis(Axis(0), 0).to_owned();
         Ok(l2_normalize(v))
     }
